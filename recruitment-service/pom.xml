@@ -11,7 +11,7 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.klu.microservices</groupId>
+    <groupId>com.klu.services</groupId>
     <artifactId>recruitment-service</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>recruitment-service</name>
