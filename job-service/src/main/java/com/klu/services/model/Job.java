@@ -1,15 +1,9 @@
 package com.klu.services.model;
 
 import jakarta.persistence.*;
-import lombok.*;
 
 @Entity
 @Table(name = "jobs")
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
 public class Job {
 
     @Id
@@ -27,10 +21,71 @@ public class Job {
     @Column(length = 2000)
     private String description;
 
-    @Builder.Default
+    @Column(nullable = false)
     private String status = "OPEN";
 
-    // Explicit Getters and Setters for guaranteed compilation
+    public Job() {
+        this.status = "OPEN";
+    }
+
+    public Job(Long jobId, String companyName, String role, String location, String description, String status) {
+        this.jobId = jobId;
+        this.companyName = companyName;
+        this.role = role;
+        this.location = location;
+        this.description = description;
+        this.status = (status != null && !status.trim().isEmpty()) ? status : "OPEN";
+    }
+
+    public static JobBuilder builder() {
+        return new JobBuilder();
+    }
+
+    public static class JobBuilder {
+        private Long jobId;
+        private String companyName;
+        private String role;
+        private String location;
+        private String description;
+        private String status = "OPEN";
+
+        public JobBuilder jobId(Long jobId) {
+            this.jobId = jobId;
+            return this;
+        }
+
+        public JobBuilder companyName(String companyName) {
+            this.companyName = companyName;
+            return this;
+        }
+
+        public JobBuilder role(String role) {
+            this.role = role;
+            return this;
+        }
+
+        public JobBuilder location(String location) {
+            this.location = location;
+            return this;
+        }
+
+        public JobBuilder description(String description) {
+            this.description = description;
+            return this;
+        }
+
+        public JobBuilder status(String status) {
+            if (status != null && !status.trim().isEmpty()) {
+                this.status = status;
+            }
+            return this;
+        }
+
+        public Job build() {
+            return new Job(jobId, companyName, role, location, description, status);
+        }
+    }
+
     public Long getJobId() {
         return jobId;
     }

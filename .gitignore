@@ -1,0 +1,13 @@
+.metadata/
+.recommenders/
+target/
+**/target/
+*.class
+*.log
+*.jar
+*.war
+*.ear
+Order_Service/
+.settings/
+.project
+.classpath
