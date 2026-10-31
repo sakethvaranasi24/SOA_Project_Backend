@@ -1,13 +1,29 @@
+# Maven build output
+**/target/
+target/
+
+# IDE files
 .metadata/
 .recommenders/
-target/
-**/target/
+.settings/
+.classpath
+.project
+.idea/
+*.iml
+.vscode/
+.factorypath
+
+# Compiled class files
 *.class
-*.log
+
+# Package Files
 *.jar
 *.war
 *.ear
-Order_Service/
-.settings/
-.project
-.classpath
+*.nar
+*.zip
+*.tar.gz
+*.rar
+
+# Logs
+*.log

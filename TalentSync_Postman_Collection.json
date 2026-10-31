@@ -1,0 +1,544 @@
+{
+  "info": {
+    "_postman_id": "78a9c240-3b6b-4c27-b956-talentsync001",
+    "name": "TalentSync Microservices API & Security Test Suite",
+    "description": "Comprehensive integration, discovery, JWT authentication, and negative RBAC security tests for TalentSync SOA architecture.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080", "type": "string" },
+    { "key": "recruiterToken", "value": "", "type": "string" },
+    { "key": "candidateToken", "value": "", "type": "string" },
+    { "key": "createdJobId", "value": "1", "type": "string" },
+    { "key": "createdAppId", "value": "1", "type": "string" },
+    { "key": "createdRecId", "value": "1", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "1. Authentication & Token Generation",
+      "item": [
+        {
+          "name": "Register Candidate",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"candidate_demo\",\n  \"password\": \"password123\",\n  \"email\": \"candidate.demo@talentsync.com\",\n  \"role\": \"ROLE_CANDIDATE\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth", "register"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 201 or 409 (if exists)\", function () {",
+                  "    pm.expect([201, 409]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register Recruiter",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"recruiter_demo\",\n  \"password\": \"password123\",\n  \"email\": \"recruiter.demo@talentsync.com\",\n  \"role\": \"ROLE_RECRUITER\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth", "register"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 201 or 409 (if exists)\", function () {",
+                  "    pm.expect([201, 409]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login Recruiter (Extract Token)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"sakeeth\",\n  \"password\": \"sakeeth123\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+                  "var jsonData = pm.response.json();",
+                  "pm.test(\"Role is ROLE_RECRUITER\", function () { pm.expect(jsonData.role).to.eql('ROLE_RECRUITER'); });",
+                  "pm.test(\"Token exists\", function () { pm.expect(jsonData.token).to.not.be.empty; });",
+                  "pm.collectionVariables.set(\"recruiterToken\", jsonData.token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login Candidate (Extract Token)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"sai\",\n  \"password\": \"saianilkumar123\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+                  "var jsonData = pm.response.json();",
+                  "pm.test(\"Role is ROLE_CANDIDATE\", function () { pm.expect(jsonData.role).to.eql('ROLE_CANDIDATE'); });",
+                  "pm.test(\"Token exists\", function () { pm.expect(jsonData.token).to.not.be.empty; });",
+                  "pm.collectionVariables.set(\"candidateToken\", jsonData.token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Validate Recruiter Token",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{recruiterToken}}" }],
+            "url": { "raw": "{{baseUrl}}/auth/validate", "host": ["{{baseUrl}}"], "path": ["auth", "validate"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+                  "var jsonData = pm.response.json();",
+                  "pm.test(\"Token is valid\", function () { pm.expect(jsonData.valid).to.be.true; });",
+                  "pm.test(\"Role is ROLE_RECRUITER\", function () { pm.expect(jsonData.role).to.eql('ROLE_RECRUITER'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Job Service (Gateway Routing & Recruiter Access)",
+      "item": [
+        {
+          "name": "Create Job (Recruiter Only - Positive)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{recruiterToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"companyName\": \"Microsoft\",\n  \"role\": \"Cloud Solutions Architect\",\n  \"location\": \"Hyderabad\",\n  \"description\": \"Azure Cloud and Microservices\",\n  \"status\": \"OPEN\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/jobs", "host": ["{{baseUrl}}"], "path": ["jobs"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () { pm.response.to.have.status(201); });",
+                  "var jsonData = pm.response.json();",
+                  "pm.test(\"Job ID created\", function () { pm.expect(jsonData.jobId).to.be.above(0); });",
+                  "pm.collectionVariables.set(\"createdJobId\", jsonData.jobId.toString());"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get All Jobs (Candidate Token - Positive)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{candidateToken}}" }],
+            "url": { "raw": "{{baseUrl}}/jobs", "host": ["{{baseUrl}}"], "path": ["jobs"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Jobs array returned\", function () { pm.expect(pm.response.json()).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Job By ID (Positive)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{candidateToken}}" }],
+            "url": { "raw": "{{baseUrl}}/jobs/{{createdJobId}}", "host": ["{{baseUrl}}"], "path": ["jobs", "{{createdJobId}}"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Job details returned\", function () { pm.expect(pm.response.json().jobId).to.eql(parseInt(pm.collectionVariables.get(\"createdJobId\"))); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Application Service (Candidate Apply & Feign Validation)",
+      "item": [
+        {
+          "name": "Candidate Apply for Job (Candidate Only - Positive)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{candidateToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jobId\": {{createdJobId}},\n  \"candidateId\": 1,\n  \"resumeLink\": \"https://github.com/sai-profile/resume.pdf\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/applications", "host": ["{{baseUrl}}"], "path": ["applications"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () { pm.response.to.have.status(201); });",
+                  "var jsonData = pm.response.json();",
+                  "pm.test(\"Application status is APPLIED\", function () { pm.expect(jsonData.status).to.eql('APPLIED'); });",
+                  "pm.collectionVariables.set(\"createdAppId\", jsonData.applicationId.toString());"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Application By ID (Positive)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{candidateToken}}" }],
+            "url": { "raw": "{{baseUrl}}/applications/{{createdAppId}}", "host": ["{{baseUrl}}"], "path": ["applications", "{{createdAppId}}"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Recruiter Updates Application Status (Recruiter Only - Positive)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{recruiterToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"SHORTLISTED\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/applications/{{createdAppId}}/status", "host": ["{{baseUrl}}"], "path": ["applications", "{{createdAppId}}", "status"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Status updated to SHORTLISTED\", function () { pm.expect(pm.response.json().status).to.eql('SHORTLISTED'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Recruitment Service (Interview Scheduling & Feign Sync)",
+      "item": [
+        {
+          "name": "Recruiter Schedules Interview (Recruiter Only - Positive)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{recruiterToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"applicationId\": {{createdAppId}},\n  \"interviewStatus\": \"SCHEDULED\",\n  \"finalStatus\": \"PENDING\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/recruitments", "host": ["{{baseUrl}}"], "path": ["recruitments"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () { pm.response.to.have.status(201); });",
+                  "var jsonData = pm.response.json();",
+                  "pm.test(\"Interview status SCHEDULED\", function () { pm.expect(jsonData.interviewStatus).to.eql('SCHEDULED'); });",
+                  "pm.collectionVariables.set(\"createdRecId\", jsonData.recruitmentId.toString());"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify Application Status Synced to INTERVIEW via Feign",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{recruiterToken}}" }],
+            "url": { "raw": "{{baseUrl}}/applications/{{createdAppId}}", "host": ["{{baseUrl}}"], "path": ["applications", "{{createdAppId}}"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Application status updated to INTERVIEW by OpenFeign\", function () { pm.expect(pm.response.json().status).to.eql('INTERVIEW'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Student & Profile Routes",
+      "item": [
+        {
+          "name": "Get All Students (Recruiter Only - Positive)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{recruiterToken}}" }],
+            "url": { "raw": "{{baseUrl}}/student/all", "host": ["{{baseUrl}}"], "path": ["student", "all"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"List of candidates returned\", function () { pm.expect(pm.response.json()).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Profile (Positive)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{candidateToken}}" }],
+            "url": { "raw": "{{baseUrl}}/profile/sai", "host": ["{{baseUrl}}"], "path": ["profile", "sai"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Username matches\", function () { pm.expect(pm.response.json().username).to.eql('sai'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6. Negative Security & RBAC Tests (401 & 403)",
+      "item": [
+        {
+          "name": "Negative: Access /jobs Without Token (Expect 401)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/jobs", "host": ["{{baseUrl}}"], "path": ["jobs"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 401 Unauthorized\", function () { pm.response.to.have.status(401); });",
+                  "var jsonData = pm.response.json();",
+                  "pm.test(\"Error indicates missing authorization\", function () { pm.expect(jsonData.message).to.include('Missing Authorization'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Negative: Tampered Token (Expect 401)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{candidateToken}}tampered" }],
+            "url": { "raw": "{{baseUrl}}/jobs", "host": ["{{baseUrl}}"], "path": ["jobs"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 401 Unauthorized\", function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Negative: Candidate Creates Job (Expect 403 Forbidden)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{candidateToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"companyName\": \"Malicious Corp\",\n  \"role\": \"Attacker\",\n  \"location\": \"Unknown\",\n  \"description\": \"Candidate should not be allowed to post jobs\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/jobs", "host": ["{{baseUrl}}"], "path": ["jobs"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 403 Forbidden\", function () { pm.response.to.have.status(403); });",
+                  "var jsonData = pm.response.json();",
+                  "pm.test(\"Error specifies ROLE_RECRUITER required\", function () { pm.expect(jsonData.message).to.include('ROLE_RECRUITER'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Negative: Recruiter Applies For Job (Expect 403 Forbidden)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{recruiterToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jobId\": {{createdJobId}},\n  \"candidateId\": 2,\n  \"resumeLink\": \"https://recruiter-resume.pdf\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/applications", "host": ["{{baseUrl}}"], "path": ["applications"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 403 Forbidden\", function () { pm.response.to.have.status(403); });",
+                  "var jsonData = pm.response.json();",
+                  "pm.test(\"Error specifies ROLE_CANDIDATE required\", function () { pm.expect(jsonData.message).to.include('ROLE_CANDIDATE'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Negative: Candidate Accesses Recruitment (Expect 403 Forbidden)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{candidateToken}}" }],
+            "url": { "raw": "{{baseUrl}}/recruitments/{{createdRecId}}", "host": ["{{baseUrl}}"], "path": ["recruitments", "{{createdRecId}}"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 403 Forbidden\", function () { pm.response.to.have.status(403); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Negative: Candidate Accesses /student/all (Expect 403 Forbidden)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{candidateToken}}" }],
+            "url": { "raw": "{{baseUrl}}/student/all", "host": ["{{baseUrl}}"], "path": ["student", "all"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 403 Forbidden\", function () { pm.response.to.have.status(403); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Negative: Candidate Updates Application Status (Expect 403 Forbidden)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{candidateToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"HIRED\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/applications/{{createdAppId}}/status", "host": ["{{baseUrl}}"], "path": ["applications", "{{createdAppId}}", "status"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 403 Forbidden\", function () { pm.response.to.have.status(403); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -59,6 +59,10 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
                     .build()
                     .parseClaimsJws(token)
                     .getBody();
+        } catch (io.jsonwebtoken.ExpiredJwtException e) {
+            return onError(exchange, "JWT Token has expired: " + e.getMessage(), HttpStatus.UNAUTHORIZED);
+        } catch (io.jsonwebtoken.security.SecurityException | io.jsonwebtoken.MalformedJwtException e) {
+            return onError(exchange, "Invalid JWT signature or format: " + e.getMessage(), HttpStatus.UNAUTHORIZED);
         } catch (Exception e) {
             return onError(exchange, "Invalid or Expired JWT Token: " + e.getMessage(), HttpStatus.UNAUTHORIZED);
         }
@@ -70,9 +74,17 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             return onError(exchange, "Access Denied: ROLE_RECRUITER permission required", HttpStatus.FORBIDDEN);
         }
 
+        if (isCandidateOnlyEndpoint(path, method) && !"ROLE_CANDIDATE".equalsIgnoreCase(role)) {
+            return onError(exchange, "Access Denied: ROLE_CANDIDATE permission required", HttpStatus.FORBIDDEN);
+        }
+
         ServerHttpRequest modifiedRequest = request.mutate()
-                .header("X-Auth-User", username)
-                .header("X-Auth-Role", role)
+                .headers(httpHeaders -> {
+                    httpHeaders.remove("X-Auth-User");
+                    httpHeaders.remove("X-Auth-Role");
+                })
+                .header("X-Auth-User", username != null ? username : "")
+                .header("X-Auth-Role", role != null ? role : "")
                 .build();
 
         return chain.filter(exchange.mutate().request(modifiedRequest).build());
@@ -88,6 +100,16 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         if (path.startsWith("/recruitments")) {
             return true;
         }
+        if (path.startsWith("/student")) {
+            return true;
+        }
+        return false;
+    }
+
+    private boolean isCandidateOnlyEndpoint(String path, String method) {
+        if (path.startsWith("/applications") && "POST".equalsIgnoreCase(method)) {
+            return true;
+        }
         return false;
     }
 
@@ -95,7 +117,14 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         ServerHttpResponse response = exchange.getResponse();
         response.setStatusCode(httpStatus);
         response.getHeaders().add("Content-Type", "application/json");
-        String body = String.format("{\"error\": \"%s\", \"status\": %d}", err, httpStatus.value());
+        String body = String.format(
+                "{\"timestamp\": \"%s\", \"status\": %d, \"error\": \"%s\", \"message\": \"%s\", \"path\": \"%s\"}",
+                java.time.Instant.now().toString(),
+                httpStatus.value(),
+                httpStatus.getReasonPhrase(),
+                err,
+                exchange.getRequest().getURI().getPath()
+        );
         return response.writeWith(Mono.just(response.bufferFactory().wrap(body.getBytes(StandardCharsets.UTF_8))));
     }
 
